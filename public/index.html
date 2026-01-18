@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parking Lots - Simple UI</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; }
+    h1 { margin-bottom: 6px; }
+    small { color: #666; }
+    form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+    input, button { padding: 10px; }
+    button { cursor: pointer; }
+    .full { grid-column: 1 / -1; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin: 10px 0; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row button { padding: 8px 10px; }
+    .error { color: #b00020; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Parking Lots</h1>
+  <small>Simple HTML/JS interface (Assignment 3)</small>
+
+  <p>
+    API base: <code>/api/parking-lots</code>
+    &nbsp;|&nbsp;
+    <a href="reservations.html">Open Reservations</a>
+  </p>
+
+  <h2>Add new parking lot</h2>
+  <form id="lotForm">
+    <input id="name" placeholder="Name" required />
+    <input id="address" placeholder="Address" required />
+    <input id="pricePerHour" type="number" step="0.01" placeholder="Price per hour" required />
+    <input id="totalSpots" type="number" placeholder="Total spots" required />
+    <label class="full">
+      <input id="hasCCTV" type="checkbox" /> Has CCTV
+    </label>
+    <button class="full" type="submit">Create</button>
+  </form>
+
+  <div id="msg" class="error"></div>
+
+  <h2>List</h2>
+  <div id="list"></div>
+
+  <script>
+    const listEl = document.getElementById('list');
+    const msgEl = document.getElementById('msg');
+
+    async function loadLots() {
+      msgEl.textContent = '';
+      listEl.innerHTML = 'Loading...';
+
+      const res = await fetch('/api/parking-lots');
+      const data = await res.json();
+
+      if (!Array.isArray(data)) {
+        listEl.innerHTML = '';
+        msgEl.textContent = JSON.stringify(data, null, 2);
+        return;
+      }
+
+      listEl.innerHTML = '';
+      data.forEach((lot) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <b>${lot.name}</b>
+          <div>${lot.address}</div>
+          <div>Price/hour: ${lot.pricePerHour}</div>
+          <div>Total spots: ${lot.totalSpots}</div>
+          <div>CCTV: ${lot.hasCCTV ? 'Yes' : 'No'}</div>
+          <div><small>ID: ${lot._id}</small></div>
+          <div class="row">
+            <button data-id="${lot._id}" class="deleteBtn">Delete</button>
+          </div>
+        `;
+        listEl.appendChild(div);
+      });
+
+      document.querySelectorAll('.deleteBtn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-id');
+          const ok = confirm('Delete this parking lot?');
+          if (!ok) return;
+
+          const delRes = await fetch(`/api/parking-lots/${id}`, { method: 'DELETE' });
+          if (delRes.status !== 204) {
+            const err = await delRes.json().catch(() => ({}));
+            msgEl.textContent = JSON.stringify(err, null, 2);
+          }
+
+          loadLots();
+        });
+      });
+    }
+
+    document.getElementById('lotForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msgEl.textContent = '';
+
+      const body = {
+        name: document.getElementById('name').value,
+        address: document.getElementById('address').value,
+        pricePerHour: Number(document.getElementById('pricePerHour').value),
+        totalSpots: Number(document.getElementById('totalSpots').value),
+        hasCCTV: document.getElementById('hasCCTV').checked
+      };
+
+      const res = await fetch('/api/parking-lots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        msgEl.textContent = JSON.stringify(err, null, 2);
+        return;
+      }
+
+      e.target.reset();
+      loadLots();
+    });
+
+    loadLots();
+  </script>
+</body>
+</html>
